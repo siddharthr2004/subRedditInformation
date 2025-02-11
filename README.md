@@ -59,7 +59,7 @@
 ##  **Setup Guide**  
 ### 1️⃣ Clone the Repository  
 ```bash  
-git clone https://github.com/yourusername/Subreddit-Analysis.git  
+git clone https://github.com/siddharthr2004/Subreddit-Analysis.git  
 cd Subreddit-Analysis  
 ```  
 
