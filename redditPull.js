@@ -1,3 +1,4 @@
+//THIS CLASS IS IRRELEVANT FOR THE TIME BEING
 const https = require('https');
 const querystring = require('querystring');
 const SortedMap = require('./sortedMap');
@@ -8,7 +9,8 @@ class redditPull {
     constructor(subreddit) {
         this.subreddit = subreddit;
     }
-
+    //NEW COMMENT 05/2025: No reason for this method to exist,
+    //this is done within the python script 
     // Function to fetch the Reddit access token
     async fetchRedditToken() {
         return new Promise((resolve, reject) => {

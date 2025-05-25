@@ -1,3 +1,4 @@
+//THIS CLASS IS IRRELEVANT FOR THE TIME BEING 05/25
 class SortedMap {
     constructor() {
       this.map = new Map(); // Initialize the map

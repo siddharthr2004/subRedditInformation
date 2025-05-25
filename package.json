@@ -1,0 +1,18 @@
+{
+  "name": "subredditinformation",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "child_process": "^1.0.2",
+    "express": "^5.1.0",
+    "path": "^0.12.7",
+    "promise": "^8.3.0"
+  }
+}

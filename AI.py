@@ -4,6 +4,8 @@ import sys
 import json
 import time
 import re
+import openai
+import os
 from nltk.tokenize import word_tokenize
 import nltk
 nltk.download("punkt")
@@ -22,19 +24,39 @@ from datetime import datetime
 
 
 class AI:
-    #This essentially acts as a constructor within the python script, and it allows
-    #you to convert things, from usernames to subreddits into reddit objects
-    #which you can further manipulate from here
     def __init__(self):
         # Replace these values with your Reddit app credentials
-        self.CLIENT_ID = "fFo133x0B-uMP6jvADZ8bg"
-        self.CLIENT_SECRET = "snptPSBqbm65QIwfnB-AdkUjw-hQ1A"
-        self.USER_AGENT = "script:SiteStats:v1.0 (by /u/Ancient-Opinion-4358)"
+        CLIENT_ID = "fFo133x0B-uMP6jvADZ8bg"
+        CLIENT_SECRET = "snptPSBqbm65QIwfnB-AdkUjw-hQ1A"
+        USER_AGENT = "script:SiteStats:v1.0 (by /u/Ancient-Opinion-4358)"
         self.reddit = praw.Reddit(
-            client_id=self.CLIENT_ID,
-            client_secret=self.CLIENT_SECRET,
-            user_agent=self.USER_AGENT
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
+            user_agent=USER_AGENT
         )
+        self.subreddit = sys.argv[1]
+    
+    def getVals(self):
+        authors = set()
+        comments = []
+        subReddit = self.reddit.subreddit(self.subreddit)
+        for comment in subReddit.comments(limit=3000):
+            if comment.author:
+                authors.add(comment.author)
+        for submission in subReddit.hot(limit=400):
+            if submission.author:
+                authors.append(submission.author)
+        for author in authors:
+            for comment in author.comments.hot(limit=200):
+                comments.append(comment)
+        for comment in comments:
+            text = comment.body
+            if(isinstance(text, str)):
+                comment = 
+
+        
+
+
 
     def initialize_users(self):
         comment_array = []  # Collect all comments here
@@ -69,10 +91,10 @@ class AI:
     
     def cleanComments(self):
         #First we'll add some defintiions within our nltk system
-        stopwords = set(stopwords.words("english"))
+        stopwordsSet = set(stopwords.words("english"))
         lemmatizer = WordNetLemmatizer()
         dirtyComments = self.initialize_users()
-        cleanedComments = [];
+        cleanedComments = []
         
         for comments in dirtyComments:
             #Check if the comment is a string the syntax below is how to check this
@@ -86,7 +108,7 @@ class AI:
                 #Tokenize the cleaned comment
                 tokens = word_tokenize(comments)
                 #Remove stop words
-                filtered_tokens = [word for word in tokens if word not in stopwords]
+                filtered_tokens = [word for word in tokens if word not in stopwordsSet]
                 #Apply lematization (Running -> Run)
                 lemmatized = [lemmatizer.lemmatize(word) for word in filtered_tokens]
                 #Recombine the tokens into a cleaned string (optional)
@@ -95,9 +117,10 @@ class AI:
                 cleanedComments.append(cleaned_comment);
 
         # Group all comments which are similar into categories and name them
-    def group_comments(comments):
+    def group_comments(self):
         # Step 1: Convert comments into a matrix of word counts (Vectorization)
         # This vectorizes the comments and creates a matrix where rows = comments and columns = unique words
+        comments = self.cleanComments()
         vectorizer = CountVectorizer(stop_words="english")
         matrix = vectorizer.fit_transform(comments)
 
@@ -201,7 +224,8 @@ class AI:
 
             # Extract the generated text and append it to 'listWords'
             generated_text = response[0]["generated_text"]  # Access the generated text
-            group_data["listWords"].append(generated_text)  # Append to 'listWords'
+            cleaned_text = generated_text.split("\n")[:500]  # ✅ Only keeps the first 500 words
+            group_data["listwords"].extend(cleaned_text)
 
         return groupedComments
 
@@ -260,12 +284,13 @@ class AI:
                 "positiveEmotion": [],
             }
     
-            for word_data in group_data["listwords"]:  # Iterate through listwords
-                # Check sentiment and append to appropriate list
-                if word_data["emotion"] == "POSITIVE":
-                    finalScores[group_name]["positiveEmotion"].append(word_data)
-                elif word_data["sentiment"] == "POSITIVE":
-                    finalScores[group_name]["positiveSentiment"].append(word_data)
+            for word_data in group_data["listwords"]:
+                if word_data in group_data["emotion"] and group_data["emotion"][word_data]["emotion"] == "POSITIVE":
+                    finalScores[group_name]["positiveEmotion"].append(group_data["emotion"][word_data])
+
+                if word_data in group_data["sentiment"] and group_data["sentiment"][word_data]["sentiment"] == "POSITIVE":
+                    finalScores[group_name]["positiveSentiment"].append(group_data["sentiment"][word_data])
+
                 
 
                 #Now sort the values within commentPosScores and commentNegScores for each
@@ -277,23 +302,26 @@ class AI:
                     finalScores[group_name]["positiveSentiment"], key=lambda x: x["confidence"], reverse=True
                 )
         
-        for group_name, group_data in finalScores.items:
+        for group_name, group_data in finalScores.items():
             
             returnedScores[group_name] = {
                 "groupName": group_name,  # Store the group's name
                 "topFiveEmotion": [],  # Initialize an empty list for the top 5 scores
                 "topFiveSentiment": []
             }
+            ######THIS HAS BEEN CHANGED TO 15 EMOTIONS AND SENTIMENTS INSTEAD OF 5#########
             # Add the top 5 positive emotions (already sorted)
             if "positive_emotions" in group_data:
-                returnedScores[group_name]["topFiveEmotion"] = group_data["positive_emotions"][:5]
+                returnedScores[group_name]["topFiveEmotion"] = group_data["positiveEmotion"][:15]
 
             # Add the top 5 positive sentiments (already sorted)
             if "positive_sentiments" in group_data:
-                returnedScores[group_name]["topFiveSentiment"] = group_data["positive_sentiments"][:5]
+                returnedScores[group_name]["topFiveSentiment"] = group_data["positiveSentiment"][:15]
 
         return returnedScores
     
+    ###################################################################################################################
+                        ###################NEW_SECTION_DEMOGRAPHICS#########################
     '''
         We have now completed the sentiment/emotional analysis on the values provided
         to the subreddit. At this step - we will not perform a demographic analysis
@@ -412,43 +440,239 @@ class AI:
             "boomer": boomer
         }
 
-        #now we will extract all of the locations
+
     def extractLocations(self):
         comments = self.cleanComments()
 
-        classifier = pipeline("zero-shot-classification", model = "facebook/bart-large-mnli")
+        classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
         # Define candidate locations
         stateCandidateLabels = [
-            # U.S. States (20 most common ones)
             "California", "Texas", "New York", "Florida", "Illinois", "Pennsylvania", "Ohio",
             "Georgia", "North Carolina", "Michigan", "New Jersey", "Virginia", "Washington",
-            "Arizona", "Massachusetts", "Tennessee", "Indiana", "Missouri", "Maryland", "Wisconsin",
-        ]
+            "Arizona", "Massachusetts", "Tennessee", "Indiana", "Missouri", "Maryland", "Wisconsin"
+     ]
 
-            # Countries (30 diverse countries)
         countryCandidateLabels = [
-            "USA", "Canada", "Mexico", "United Kingdom", "France", "Germany", "Italy", "Spain",
-            "Australia", "India", "China", "Japan", "South Korea", "Brazil", "Argentina", "Belgium",
-            "Russia", "Turkey", "Egypt", "Saudi Arabia", "Nigeria", "Kenya", "Sweden", "Norway", "Netherlands",
-            "Switzerland", "Poland", "Ukraine", "Indonesia", "Philippines"
-        ]
+          "USA", "Canada", "Mexico", "United Kingdom", "France", "Germany", "Italy", "Spain",
+           "Australia", "India", "China", "Japan", "South Korea", "Brazil", "Argentina", "Belgium",
+           "Russia", "Turkey", "Egypt", "Saudi Arabia", "Nigeria", "Kenya", "Sweden", "Norway", "Netherlands",
+          "Switzerland", "Poland", "Ukraine", "Indonesia", "Philippines"
+      ]
 
         continentCandidateLabels = [
-            "North America", "South America", "Europe", "Asia", "Africa", "Australia", "Antarctica"
+          "North America", "South America", "Europe", "Asia", "Africa", "Australia", "Antarctica"
         ]
 
-        AIResultsState = classifier(comments, stateCandidateLabels);
-        AIResultsCountry = classifier(comments, countryCandidateLabels)
-        AIResultsContinent = classifier(comments, continentCandidateLabels)
+        # ✅ Corrected `hypothesis_template` usage
+        AIResultsState = classifier(comments, stateCandidateLabels, hypothesis_template="This person is from {}.")
+        AIResultsCountry = classifier(comments, countryCandidateLabels, hypothesis_template="This person is from {}.")
+        AIResultsContinent = classifier(comments, continentCandidateLabels, hypothesis_template="This person is from {}.")
 
-        statConfidence = {}, countryConfidence = {}, continentConfidence = {}
+        # Initialize count dictionaries
+        stateCounts, countryCounts, continentCounts = {}, {}, {}
+
+        # Loop through comments to store counts
+        for i, comment in enumerate(comments):
+            if AIResultsState[i]["scores"][0] > 0.8:
+                location = AIResultsState[i]['labels'][0]
+                stateCounts[location] = stateCounts.get(location, 0) + 1
+            if AIResultsCountry[i]["scores"][0] > 0.8:
+                location = AIResultsCountry[i]['labels'][0]
+                countryCounts[location] = countryCounts.get(location, 0) + 1
+            if AIResultsContinent[i]["scores"][0] > 0.8:
+                location = AIResultsContinent[i]['labels'][0]
+                continentCounts[location] = continentCounts.get(location, 0) + 1
+
+        # 🔹 Sort dictionaries and return the top 5
+        sortedStateCounts = sorted(stateCounts.items(), key=lambda item: item[1], reverse=True)[:5]  
+        sortedCountryCounts = sorted(countryCounts.items(), key=lambda item: item[1], reverse=True)[:5]  
+        sortedContinentCounts = sorted(continentCounts.items(), key=lambda item: item[1], reverse=True)[:5]  
+
+        return sortedStateCounts, sortedCountryCounts, sortedContinentCounts
+    
+    from transformers import pipeline
+
+    from transformers import pipeline
+
+    def extractSocioEconomicDemographics(self):
+        comments = self.cleanComments()
+
+        classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+        # **Step 1: Broad Categories**
+        employmentLabels = ["Employed", "Unemployed"]
+        educationLabels = ["College Graduate", "No College"]
+
+        # **Step 2: Detailed Categories**
+        occupationLabels = [
+            # White-collar
+            "Software Engineer", "Data Scientist", "Financial Analyst", "Marketing Manager",
+            "Sales Representative", "Consultant", "Accountant", "Project Manager",
+            "Lawyer", "Doctor", "Nurse", "Professor", "Architect", "Journalist",
+
+            # Blue-collar
+            "Factory Worker", "Construction Worker", "Electrician", "Plumber", "Mechanic",
+            "Truck Driver", "Welder", "Carpenter", "HVAC Technician", "Auto Technician",
+
+            # Service jobs
+            "Retail Worker", "Customer Service Representative", "Barista", "Waiter", "Bartender",
+            "Chef", "Janitor", "Hotel Staff", "Cashier", "Delivery Driver",
+
+            # Creative & independent work
+            "Artist", "Writer", "Musician", "YouTuber", "Influencer", "Game Developer",
+            "Photographer", "Graphic Designer", "Filmmaker", "Twitch Streamer",
+
+            # Military, government, and law enforcement
+            "Military Personnel", "Police Officer", "Firefighter", "Government Employee",
+            "Politician", "Diplomat", "CIA Agent", "FBI Agent",
+
+            # Self-employed
+            "Self-Employed", "Entrepreneur", "Freelancer", "Gig Worker",
+        ]
+
+        incomeLabels = ["Low Income", "Lower Middle Class", "Middle Class", "Upper Middle Class", "High Income"]
+
+        # **Step 1: Classify Broad Categories**
+        AIResultsEmployment = classifier(comments, employmentLabels, hypothesis_template="This person is {}.")
+        AIResultsEducation = classifier(comments, educationLabels, hypothesis_template="This person has {} education.")
+        AIResultsIncome = classifier(comments, incomeLabels, hypothesis_template="This person belongs to the {} income group.")
+
+        # Dictionaries to store counts
+        employmentCounts, educationCounts, occupationCounts, incomeCounts = {}, {}, {}, {}
+
+        employedCount = 0
+        unemployedCount = 0
+
+        for i, comment in enumerate(comments):
+            # **Step 1: Store broad category classifications**
+            if AIResultsEmployment[i]["scores"][0] > 0.8:
+                category = AIResultsEmployment[i]['labels'][0]
+                employmentCounts[category] = employmentCounts.get(category, 0) + 1
+
+                # Track total counts
+                if category == "Employed":
+                    employedCount += 1
+                else:
+                    unemployedCount += 1
+
+            if AIResultsEducation[i]["scores"][0] > 0.8:
+                category = AIResultsEducation[i]['labels'][0]
+                educationCounts[category] = educationCounts.get(category, 0) + 1
+
+            # **Step 2: Classify Occupation Only for "Employed"**
+            if category == "Employed":
+                AIResultsOccupation = classifier(comment, occupationLabels, hypothesis_template="This person works as a {}.")
+                if AIResultsOccupation["scores"][0] > 0.8:
+                    job = AIResultsOccupation['labels'][0]
+                    occupationCounts[job] = occupationCounts.get(job, 0) + 1
+
+            # **Step 2: Classify Income for Everyone**
+            AIResultsIncomeForComment = classifier(comment, incomeLabels, hypothesis_template="This person belongs to the {} income group.")
+            if AIResultsIncomeForComment["scores"][0] > 0.8:
+                incomeCategory = AIResultsIncomeForComment['labels'][0]
+                incomeCounts[incomeCategory] = incomeCounts.get(incomeCategory, 0) + 1
+
+        # **Sort and Return the Top 5 for Each**
+        sortedEmploymentCounts = sorted(employmentCounts.items(), key=lambda item: item[1], reverse=True)
+        sortedEducationCounts = sorted(educationCounts.items(), key=lambda item: item[1], reverse=True)[:5]
+        sortedOccupationCounts = sorted(occupationCounts.items(), key=lambda item: item[1], reverse=True)[:5]
+        sortedIncomeCounts = sorted(incomeCounts.items(), key=lambda item: item[1], reverse=True)[:5]
+
+        return {
+            "Employment Breakdown": sortedEmploymentCounts,
+            "Total Employed": employedCount,
+            "Total Unemployed": unemployedCount,
+            "Top Education Levels": sortedEducationCounts,
+            "Top Occupations": sortedOccupationCounts,
+            "Top Income Brackets": sortedIncomeCounts
+        }
+    
+    #extract gender, political affiliation, race, lgbtq+, religion grouping
+    def extractIdentity(self):
+        comments = self.cleanComments()
+
+        classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+        # Different grouping
+        categories = {
+            "race": ["white", "black", "asian", "latino", "hispanic", "indian", "arab"],
+            "gender": ["man", "woman", "nonbinary", "trans", "female", "male"],
+            "lgbt": ["gay", "lesbian", "bisexual", "pansexual", "transgender", "queer"],
+            "politics": ["liberal", "conservative", "leftist", "right-wing", "democrat", "republican"],
+            "religion": ["Christian", "Muslim", "Jewish", "Hindu", "Buddhist", "Atheist"]
+        }
+
+        # Initialize dictionary to hold scores
+        identityScores = {category: {label: 0 for label in labels} for category, labels in categories.items()}
+
+        for comment in comments:
+           # Category is race, gender, etc.; labels is dictionary of {"white": 0, "black": 0, ...}
+           for category, labels in identityScores.items():
+               # Classify using all labels in the category
+               result = classifier(comment, list(labels.keys()), multi_label=True)
+
+               # Loop through classification results
+               for label, score in zip(result["labels"], result["scores"]): 
+                   if score > 0.5:
+                       identityScores[category][label] += 1  # Fix dictionary update
+
+        # Sort and get top 2 labels per category
+        topLabelsPerCategory = {}
+        for category, labels in identityScores.items():
+            sortedLabels = sorted(labels.items(), key=lambda x: x[1], reverse=True)  # Fix sorting
+            topLabelsPerCategory[category] = sortedLabels[:2]  # Extract top 2
+
+        return topLabelsPerCategory  # Move return outside the loop
+
+    def prepareDataForRegression(self):
+        # Extract all demographic data
+        ageData = self.extractAge()
+        locationData = self.extractLocations()
+        socioEconomicData = self.extractSocioEconomicDemographics()
+        identityData = self.extractIdentity()
+        sentimentAndEmotionData = self.sentimentAndEmotionAnalysis()  
+
+        promptFull = f"""
+        Based on the following information which has been extracted from these subreddits
+        your goal and job is to product 15 best fit marketing products which would do the 
+        best on this subreddit, and would garner the most positive reactions and "sellability"
+        on this sub. 
+
+        I will first input the 15 most positive reactions  to different common marketing and/or 
+        business terms which the subreddit had. {sentimentAndEmotionData}
+
+        I will now input a bunch of demographic data which I had collected from this subreddit:
+        age: {ageData}, 
+        location: {locationData},
+        socioEconomic information: {socioEconomicData},
+        Identity information (race, sex, gender, sexuality, religion): {identityData}
+        """
+        
+        openai.api_key = (
+            "sk-proj-hKkIFM7ijRoljf66Xj8wVbzfoxLdQ0L8vqlkFrG340nj34qwA4JfNgZV7"
+            "ZVp1OA8AC0WkwU46uT3BlbkFJwmEeLKY2fOgErzLXQ9itE4NsmlvOEMs6mN5ul6b_j"
+            "vsEQ_iiWi8YGyi6M9Qd8rAAAdlPsLH9MA"
+        )
+
+        
+        response = openai.completions.create(  # ✅ Correct function
+            model="gpt-3.5-turbo-instruct",
+            prompt=promptFull,  # ✅ Correct syntax
+            max_tokens=100  # Optional limit on response length
+        )
+
+        return response
+
+
+
+
+
 
         
 
 
-
-
-
+    
 
 
 
