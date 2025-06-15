@@ -6,7 +6,6 @@ import time
 import re
 import openai
 import os
-from nltk.tokenize import word_tokenize
 import nltk
 nltk.download("punkt")
 from nltk.corpus import stopwords
@@ -40,9 +39,13 @@ class AI:
         authors = set()
         comments = []
         subReddit = self.reddit.subreddit(self.subreddit)
+        cleanedComments = []
+        stopwordsSet = set(stopwords.words("english"))
+        lemmatizer = WordNetLemmatizer()
+        vectorizer = CountVectorizer()
         for comment in subReddit.comments(limit=3000):
             if comment.author:
-                authors.add(comment.author)
+                authors.append(comment.author)
         for submission in subReddit.hot(limit=400):
             if submission.author:
                 authors.append(submission.author)
@@ -52,10 +55,15 @@ class AI:
         for comment in comments:
             text = comment.body
             if(isinstance(text, str)):
-                comment = 
-
-        
-
+                cleanedComment = re.sub(r"http\S+|www\S+|https\S+", "", text)
+                cleanedComment = re.sub(r"^[a-z]\s", "", cleanedComment.lower())
+                cleanedComment = re.sub(r"\s+", "", cleanedComment.strip())
+                tokens = word_tokenize(cleanedComment)
+                commentsNew = [words for words in tokens if words not in stopwordsSet]
+                lemmatizedWord = [lemmatizer.lemmatize(words) for words in commentsNew]
+                cleanedComment = " ".join(lemmatizedWord)
+                cleanedComments.append(cleanedComment)
+        matrix = vectorizer.fit_transform(cleanedComments)
 
 
     def initialize_users(self):
