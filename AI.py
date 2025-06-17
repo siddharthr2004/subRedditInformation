@@ -7,17 +7,15 @@ import re
 import openai
 import os
 import nltk
+import numpy as np
 nltk.download("punkt")
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
-#these are the nlm scikit-learn libraries which are able to take the comments
-#and place each of them within sub categories 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
-#This import is for the hugging-face library which allows you to take prompt
-#questions to a GPT-2 model which is what I use for my sentiment pre-list
 from transformers import pipeline
+from transformers import set_seed
 from datetime import datetime
 
 
@@ -35,14 +33,13 @@ class AI:
         )
         self.subreddit = sys.argv[1]
     
-    def getVals(self):
+    def getComments(self):
         authors = set()
         comments = []
         subReddit = self.reddit.subreddit(self.subreddit)
         cleanedComments = []
         stopwordsSet = set(stopwords.words("english"))
         lemmatizer = WordNetLemmatizer()
-        vectorizer = CountVectorizer()
         for comment in subReddit.comments(limit=3000):
             if comment.author:
                 authors.append(comment.author)
@@ -63,7 +60,29 @@ class AI:
                 lemmatizedWord = [lemmatizer.lemmatize(words) for words in commentsNew]
                 cleanedComment = " ".join(lemmatizedWord)
                 cleanedComments.append(cleanedComment)
-        matrix = vectorizer.fit_transform(cleanedComments)
+                return cleanedComments
+        
+    def getProducts(self):
+        generator = pipeline("text-generation", model="gpt2-large")
+        set_seed(42)
+        vector = generator('''"Generate 2000 distinct short phrases that reflect individual lifestyle preferences and consumer product usage. 
+                           Each phrase should relate to personal choices, routines, or experiences involving specific product categories such as 
+                           fitness, electronics, fashion, nutrition, home decor, travel gear, or digital services. Phrases should resemble 
+                           real-world expressions, reviews, or habits shared by consumers online.''', max_length = 30, num_return_sequences=2000, 
+                           temperature=0.8, top_p=0.9, top_k=50)
+        phrases = [phrase['generated_text'] for phrase in vector]
+        return phrases
+    
+    def getTopScores(self):
+        products = self.getProducts()
+        comments = self.getComments()
+        # Initialize the sentiment analysis pipeline
+        
+        
+
+                
+
+        
 
 
     def initialize_users(self):
