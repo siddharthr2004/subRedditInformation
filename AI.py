@@ -7,6 +7,8 @@ import re
 import openai
 import os
 import nltk
+import torch
+import math
 import numpy as np
 nltk.download("punkt")
 from nltk.corpus import stopwords
@@ -16,9 +18,11 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
 from transformers import pipeline
 from transformers import set_seed
+from sentence_transformers import SentenceTransformer
 from datetime import datetime
 
-
+#Initial example freezes the products, new implementation will defreeze and change the product embeddings by a certain amount
+# ...but this will be done later
 
 class AI:
     def __init__(self):
@@ -76,4 +80,52 @@ class AI:
     def getTopScores(self):
         products = self.getProducts()
         comments = self.getComments()
-        
+        classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+        set_seed(42)
+        topScores = np.zeros(len(products))
+        for comment in comments:
+            output = classifier(comment, products, multi_label=True)
+            currentScores = np.array(output['scores'])
+            topScores += currentScores
+        paired = list(zip(products, topScores))
+        topScores = sorted(paired, key = lambda x:x[1], reverse=True)[200:]
+        bottomScores = sorted(paired, key = lambda x:x[1], reverse=False)[:200]
+        topProducts = [item[0] for item in topScores]
+        bottomProducts = [item[0] for item in bottomScores]
+        return {topProducts, bottomProducts}
+    
+    #Use weighted pooling going into the future
+    def makeTensor(self):
+        model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')
+        comments = self.getComments()
+        tensor = model.encode(comments[0], convert_to_tensor=True) 
+        for i in range(1, len(comments)):
+            tensor = torch.add(tensor, model.encode(comments[i], convert_to_tensor=True))
+        tensor = torch.div(tensor, len(comments))
+        return tensor
+
+    def maximizeDotProduct(self):
+        subredditTensor = self.makeTensor()
+        model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')
+        dotProductList = []
+        topProducts, bottomScores = self.getTopScores()
+        for product in topProducts:
+            productTensor = model.encode(product, convert_to_tensor=True)
+            dotProduct = torch.dot(subredditTensor, productTensor)
+            weightedVal = max(0, 0.8 - dotProduct)
+            if weightedVal > 0:
+                dotProductList.append((productTensor, weightedVal))
+        updateDirection = torch.zeros_like(subredditTensor)
+        totalWeight = 0.0
+        for productTensor, weightedVal in dotProductList:
+            updateVal = torch.mul(productTensor, weightedVal)
+            updateDirection.append(updateVal)     
+            totalWeight += weightedVal
+        if totalWeight > 0:
+            updateDirection = torch.div(updateDirection, totalWeight)
+            
+
+
+
+    
+    
