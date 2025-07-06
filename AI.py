@@ -27,9 +27,9 @@ from datetime import datetime
 class AI:
     def __init__(self):
         # Replace these values with your Reddit app credentials
-        CLIENT_ID = "fFo133x0B-uMP6jvADZ8bg"
-        CLIENT_SECRET = "snptPSBqbm65QIwfnB-AdkUjw-hQ1A"
-        USER_AGENT = "script:SiteStats:v1.0 (by /u/Ancient-Opinion-4358)"
+        CLIENT_ID = "IV3KzklQLKbcdr6QrNorZg"
+        CLIENT_SECRET = "jv9DBrsI1GQIdQhhfUUR1B-tik2WkQ"
+        USER_AGENT = "script:SiteStats:v1.0 (by /u/siddharth_reddit_acc)"
         self.reddit = praw.Reddit(
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
@@ -64,7 +64,7 @@ class AI:
                 lemmatizedWord = [lemmatizer.lemmatize(words) for words in commentsNew]
                 cleanedComment = " ".join(lemmatizedWord)
                 cleanedComments.append(cleanedComment)
-                return cleanedComments
+        return cleanedComments
         
     def getProducts(self):
         generator = pipeline("text-generation", model="gpt2-large")
@@ -88,11 +88,13 @@ class AI:
             currentScores = np.array(output['scores'])
             topScores += currentScores
         paired = list(zip(products, topScores))
+        #TESTING ONLY
+        print([vals for vals, product in paired])
         topScores = sorted(paired, key = lambda x:x[1], reverse=True)[200:]
         bottomScores = sorted(paired, key = lambda x:x[1], reverse=False)[:200]
         topProducts = [item[0] for item in topScores]
         bottomProducts = [item[0] for item in bottomScores]
-        return {topProducts, bottomProducts}
+        return {"top": topProducts, "bottom": bottomProducts}
     
     #Use weighted pooling going into the future
     def makeTensor(self):
@@ -108,13 +110,12 @@ class AI:
         subredditTensor = self.makeTensor()
         model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')
         dotProductList = []
-        topProducts, bottomScores = self.getTopScores()
+        topProducts, bottomProducts = self.getTopScores()
         for product in topProducts:
             productTensor = model.encode(product, convert_to_tensor=True)
             dotProduct = torch.dot(subredditTensor, productTensor)
-            weightedVal = max(0, 0.8 - dotProduct)
-            if weightedVal > 0:
-                dotProductList.append((productTensor, weightedVal))
+            weightedVal = torch.exp(-dotProduct)
+            dotProductList.append((productTensor, weightedVal))
         updateDirection = torch.zeros_like(subredditTensor)
         totalWeight = 0.0
         for productTensor, weightedVal in dotProductList:
@@ -123,6 +124,9 @@ class AI:
             totalWeight += weightedVal
         if totalWeight > 0:
             updateDirection = torch.div(updateDirection, totalWeight)
+    
+test = AI()
+test.getTopScores()
             
 
 
