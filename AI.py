@@ -4,13 +4,16 @@ import sys
 import json
 import time
 import re
-import openai
+from openai import OpenAI
 import os
 import nltk
 import torch
 import math
 import numpy as np
-nltk.download("punkt")
+nltk.download("punkt", quiet=True)
+nltk.download('stopwords', quiet = True)
+nltk.download('punkt_tab', quiet = True)
+nltk.download('wordnet', quiet = True)
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
@@ -36,8 +39,11 @@ class AI:
             user_agent=USER_AGENT
         )
         self.subreddit = sys.argv[1]
+        #TEST
+        print(self.subreddit) 
     
     def getComments(self):
+        print("came here 1")
         authors = set()
         comments = []
         subReddit = self.reddit.subreddit(self.subreddit)
@@ -46,40 +52,75 @@ class AI:
         lemmatizer = WordNetLemmatizer()
         for comment in subReddit.comments(limit=3000):
             if comment.author:
-                authors.append(comment.author)
+                authors.add(comment.author)
         for submission in subReddit.hot(limit=400):
             if submission.author:
-                authors.append(submission.author)
+                authors.add(submission.author)
         for author in authors:
-            for comment in author.comments.hot(limit=200):
-                comments.append(comment)
+            try:
+                for comment in (author.comments.hot(limit=200)):
+                    comments.append(comment)
+            except Exception as e:
+                print(f"Error fetching comments for author {author}: {e}")
+        print("dont adding values to comment")
         for comment in comments:
             text = comment.body
             if(isinstance(text, str)):
                 cleanedComment = re.sub(r"http\S+|www\S+|https\S+", "", text)
-                cleanedComment = re.sub(r"^[a-z]\s", "", cleanedComment.lower())
-                cleanedComment = re.sub(r"\s+", "", cleanedComment.strip())
+                cleanedComment = cleanedComment.strip()
+                cleanedComment = re.sub(r"\s+", " ", cleanedComment)
                 tokens = word_tokenize(cleanedComment)
                 commentsNew = [words for words in tokens if words not in stopwordsSet]
                 lemmatizedWord = [lemmatizer.lemmatize(words) for words in commentsNew]
                 cleanedComment = " ".join(lemmatizedWord)
                 cleanedComments.append(cleanedComment)
         return cleanedComments
-        
+    
     def getProducts(self):
-        generator = pipeline("text-generation", model="gpt2-large")
-        set_seed(42)
-        vector = generator('''"Generate 2000 distinct short phrases that reflect individual lifestyle preferences and consumer product usage. 
-                           Each phrase should relate to personal choices, routines, or experiences involving specific product categories such as 
-                           fitness, electronics, fashion, nutrition, home decor, travel gear, or digital services. Phrases should resemble 
-                           real-world expressions, reviews, or habits shared by consumers online.''', max_length = 30, num_return_sequences=2000, 
-                           temperature=0.8, top_p=0.9, top_k=50)
-        phrases = [phrase['generated_text'] for phrase in vector]
-        return phrases
+        file = open("products.txt", "w")
+        client = OpenAI(
+        api_key="sk-proj-PtdtRgKHndHoOxGX0gqcRHinM8hEvnA-QhVw25O0vz2_o84SJnYBJpMTvft" \
+                "0rF9-HTyhl1vvzDT3BlbkFJPNiZV-44MS1dvalRxhnQeZZuaCq6J8nWl7rQnTT7zCiNk" \
+                "259nbw7S-Dw0jQHLyuaDiZXMIvlgA"
+        )
+        for _ in range(8):
+            ans = []
+            response = client.chat.completions.create(
+                model="gpt-4-1106-preview",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": "Generate 100 short descriptive identity phrases. Each phrase should "
+                        "combine traits, labels, or roles that describe types of people. These can include"
+                        "political, emotional, social, racial, occupational, or behavioral dimensions."
+
+                        "Examples:"
+                        "- liberal activist"
+                        "- conservative parent"
+                        "- black entrepreneur"
+                        "- white suburban voter"
+                        "- blue-collar mechanic"
+                        "- logical analyst"
+                        "- emotion-driven leader"
+                        "- socially awkward genius"
+                        "- hyper-organized scheduler"
+                        "- risk-taking gambler"
+                    }
+                ],
+            )
+            ans = response.choices[0].message.content	
+            file.write(ans)
     
     def getTopScores(self):
         products = self.getProducts()
         comments = self.getComments()
+        #test
+        for product in products:
+            print(product)
+        for comment in comments:
+            print(comment)
+        print("came here 1")
+        #test
         classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
         set_seed(42)
         topScores = np.zeros(len(products))
@@ -126,7 +167,9 @@ class AI:
             updateDirection = torch.div(updateDirection, totalWeight)
     
 test = AI()
-test.getTopScores()
+if (test):
+    print("GETTING VALS...")
+    test.getProducts()
             
 
 
