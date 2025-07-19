@@ -12,3 +12,9 @@ myenv/
 
 # VS Code settings
 .vscode/
+
+#ignore get-pip.py
+get-pip.py
+
+#ignore node_modules
+node_modules/
