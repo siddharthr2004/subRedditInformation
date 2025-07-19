@@ -50,15 +50,18 @@ class AI:
         cleanedComments = []
         stopwordsSet = set(stopwords.words("english"))
         lemmatizer = WordNetLemmatizer()
-        for comment in subReddit.comments(limit=3000):
+        #Original is 3k
+        for comment in subReddit.comments(limit=30):
             if comment.author:
                 authors.add(comment.author)
-        for submission in subReddit.hot(limit=400):
+        #original is 400
+        for submission in subReddit.hot(limit=4):
             if submission.author:
                 authors.add(submission.author)
         for author in authors:
             try:
-                for comment in (author.comments.hot(limit=200)):
+                #original is 200
+                for comment in (author.comments.hot(limit=2)):
                     comments.append(comment)
             except Exception as e:
                 print(f"Error fetching comments for author {author}: {e}")
@@ -110,27 +113,37 @@ class AI:
             )
             ans = response.choices[0].message.content	
             file.write(ans)
+
+    def makeProductArray(self):
+        arr = []
+        with open('products.txt', 'r') as file:
+            for line in file:
+                arr.append(re.sub(r"^\s*\d+[\.\)\-]*\s*","",line))
+        return arr
     
     def getTopScores(self):
-        products = self.getProducts()
-        comments = self.getComments()
-        #test
-        for product in products:
-            print(product)
-        for comment in comments:
-            print(comment)
-        print("came here 1")
-        #test
-        classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+        products = np.array(self.makeProductArray())
+        comments = np.array(self.getComments())
+        classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", device = 1)
         set_seed(42)
         topScores = np.zeros(len(products))
-        for comment in comments:
-            output = classifier(comment, products, multi_label=True)
-            currentScores = np.array(output['scores'])
-            topScores += currentScores
+        productBatch = np.array_split(products, 200)
+        for i in range(len(comments)):
+            fullArray = np.array([])
+            for j in range(len(productBatch)):
+                print(len(productBatch))
+                print("trying to print vals from productBatch")
+                print("printing the comment", comments[i])
+                for product in productBatch[j]:
+                    print(product)
+                output = classifier(comments[i], productBatch[j], multi_label = True)
+                currentScores = np.array(output['scores'])
+                #TEST
+                print(currentScores)
+                fullArray = np.concatenate(fullArray, currentScores)
+                time.sleep(0.1)
+            topScores += fullArray
         paired = list(zip(products, topScores))
-        #TESTING ONLY
-        print([vals for vals, product in paired])
         topScores = sorted(paired, key = lambda x:x[1], reverse=True)[200:]
         bottomScores = sorted(paired, key = lambda x:x[1], reverse=False)[:200]
         topProducts = [item[0] for item in topScores]
@@ -169,7 +182,8 @@ class AI:
 test = AI()
 if (test):
     print("GETTING VALS...")
-    test.getProducts()
+    arr = test.getTopScores()
+    
             
 
 
