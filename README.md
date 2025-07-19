@@ -4,7 +4,7 @@ Using AI, sentiment analysis and neural networks to match subreddits to their be
 ## **Features:**
 - Uses gradient testing from thousands of comments to match best fit products
 - Synthesizes and outputs large list ranked with best products to be marketed on each sub 
-- Holds storage information on best product within each sub, and updates weekl
+- Holds storage information on best product within each sub, and updates weekly
 
 ##  **Key Files & Structure**  
 - **`app.js`**  Backend API used for web rendering (in progress) 
