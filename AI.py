@@ -211,6 +211,7 @@ class AI:
         for product in products:
             outputProductToDot = cos(product, maxDotProduct)
             outputProductToSub = cos(product, subreddit)
+            loss = (outputProductToDot - outputProductToSub) **2
             
            
 
