@@ -1,4 +1,5 @@
 import praw
+import asyncpraw
 import subprocess
 import sys
 import json
@@ -23,6 +24,7 @@ from transformers import pipeline
 from transformers import set_seed
 from sentence_transformers import SentenceTransformer
 from datetime import datetime
+import asyncio
 
 #Initial example freezes the products, new implementation will defreeze and change the product embeddings by a certain amount
 # ...but this will be done later
@@ -33,39 +35,40 @@ class AI:
         CLIENT_ID = "IV3KzklQLKbcdr6QrNorZg"
         CLIENT_SECRET = "jv9DBrsI1GQIdQhhfUUR1B-tik2WkQ"
         USER_AGENT = "script:SiteStats:v1.0 (by /u/siddharth_reddit_acc)"
-        self.reddit = praw.Reddit(
+        self.reddit = asyncpraw.Reddit(
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
             user_agent=USER_AGENT
         )
-        self.subreddit = sys.argv[1]
+        # The user is passing subreddit as a command line argument, which won't work directly in Colab.
+        # I will hardcode a default value for now.
+        self.subreddit = "learnpython" #sys.argv[1]
         #TEST
-        print(self.subreddit) 
-    
-    def getComments(self):
-        print("came here 1")
+        print(self.subreddit)
+
+    async def getComments(self):
         authors = set()
         comments = []
-        subReddit = self.reddit.subreddit(self.subreddit)
+        subReddit = await self.reddit.subreddit(self.subreddit)
         cleanedComments = []
         stopwordsSet = set(stopwords.words("english"))
         lemmatizer = WordNetLemmatizer()
         #Original is 3k
-        for comment in subReddit.comments(limit=30):
+        async for comment in subReddit.comments(limit=30):
             if comment.author:
                 authors.add(comment.author)
         #original is 400
-        for submission in subReddit.hot(limit=4):
+        async for submission in subReddit.hot(limit=4):
             if submission.author:
                 authors.add(submission.author)
-        for author in authors:
+        # Convert the set to a list before iterating asynchronously
+        for author in list(authors):
             try:
                 #original is 200
-                for comment in (author.comments.hot(limit=2)):
+                async for comment in (await self.reddit.redditor(author.name)).comments.hot(limit=2):
                     comments.append(comment)
             except Exception as e:
                 print(f"Error fetching comments for author {author}: {e}")
-        print("dont adding values to comment")
         for comment in comments:
             text = comment.body
             if(isinstance(text, str)):
@@ -76,15 +79,16 @@ class AI:
                 commentsNew = [words for words in tokens if words not in stopwordsSet]
                 lemmatizedWord = [lemmatizer.lemmatize(words) for words in commentsNew]
                 cleanedComment = " ".join(lemmatizedWord)
-                cleanedComments.append(cleanedComment)
+                if cleanedComment: # Add this check
+                    cleanedComments.append(cleanedComment)
         return cleanedComments
-    
+
     def getProducts(self):
         file = open("products.txt", "w")
         client = OpenAI(
-        api_key="sk-proj-PtdtRgKHndHoOxGX0gqcRHinM8hEvnA-QhVw25O0vz2_o84SJnYBJpMTvft" \
+        api_key="sk-proj-PtdtRgKHndHoOxGX0gqcRHinM8hEvnA-QhVw25O0vz_o84SJnYBJpMTvft" \
                 "0rF9-HTyhl1vvzDT3BlbkFJPNiZV-44MS1dvalRxhnQeZZuaCq6J8nWl7rQnTT7zCiNk" \
-                "259nbw7S-Dw0jQHLyuaDiZXMIvlgA"
+                "259nbw7S-Dw0jQHLyuaDiZXMIlggA"
         )
         for _ in range(8):
             ans = []
@@ -111,82 +115,116 @@ class AI:
                     }
                 ],
             )
-            ans = response.choices[0].message.content	
-            file.write(ans)
+            ans = response.choices[0].message.content
+            file.write(ans + "\n") # Add newline for each phrase set
 
     def makeProductArray(self):
         arr = []
         with open('products.txt', 'r') as file:
             for line in file:
-                arr.append(re.sub(r"^\s*\d+[\.\)\-]*\s*","",line))
+                line = re.sub(r"^\s*\d+[\.\)\-]*\s*","",line).strip() # Added strip()
+                if line: # Add this check
+                    arr.append(line)
         return arr
-    
-    def getTopScores(self):
-        products = np.array(self.makeProductArray())
-        comments = np.array(self.getComments())
-        classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", device = 1)
+
+    async def getTopScores(self):
+        products = np.array(self.makeProductArray())[:10]
+        comments = np.array(await self.getComments())
+        classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", device = 0)
         set_seed(42)
         topScores = np.zeros(len(products))
-        productBatch = np.array_split(products, 200)
+        #original here is 200
+        productBatch = np.array_split(products, 2)
         for i in range(len(comments)):
-            fullArray = np.array([])
-            for j in range(len(productBatch)):
-                print(len(productBatch))
-                print("trying to print vals from productBatch")
-                print("printing the comment", comments[i])
-                for product in productBatch[j]:
-                    print(product)
-                output = classifier(comments[i], productBatch[j], multi_label = True)
-                currentScores = np.array(output['scores'])
-                #TEST
-                print(currentScores)
-                fullArray = np.concatenate(fullArray, currentScores)
-                time.sleep(0.1)
-            topScores += fullArray
+            if len(comments[i]) > 0:
+                fullArray = np.array([])
+                for j in range(len(productBatch)):
+                  output = classifier(comments[i], productBatch[j], multi_label = True)
+                  currentScores = np.array(output['scores'])
+                  fullArray = np.concatenate([fullArray, currentScores])
+                  time.sleep(0.001)
+            topScores += fullArray 
+
         paired = list(zip(products, topScores))
-        topScores = sorted(paired, key = lambda x:x[1], reverse=True)[200:]
-        bottomScores = sorted(paired, key = lambda x:x[1], reverse=False)[:200]
+        #original amount if 200
+        topScores = sorted(paired, key = lambda x:x[1], reverse=True)[:2]
+        #original amountis 200
+        bottomScores = sorted(paired, key=lambda x: x[1])[:2]
         topProducts = [item[0] for item in topScores]
         bottomProducts = [item[0] for item in bottomScores]
+
         return {"top": topProducts, "bottom": bottomProducts}
-    
-    #Use weighted pooling going into the future
-    def makeTensor(self):
+
+    async def makeTensor(self):
         model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')
-        comments = self.getComments()
-        tensor = model.encode(comments[0], convert_to_tensor=True) 
+        comments = await self.getComments()
+        if not comments: # Add check for empty comments
+            print("No comments to make tensor from.")
+            return None
+        tensor = model.encode(comments[0], convert_to_tensor=True)
         for i in range(1, len(comments)):
             tensor = torch.add(tensor, model.encode(comments[i], convert_to_tensor=True))
         tensor = torch.div(tensor, len(comments))
         return tensor
-
-    def maximizeDotProduct(self):
-        subredditTensor = self.makeTensor()
+      
+    async def maximizeDotProduct(self):
+        subredditTensor = await self.makeTensor()
         model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')
-        dotProductList = []
-        topProducts, bottomProducts = self.getTopScores()
-        for product in topProducts:
-            productTensor = model.encode(product, convert_to_tensor=True)
-            dotProduct = torch.dot(subredditTensor, productTensor)
-            weightedVal = torch.exp(-dotProduct)
-            dotProductList.append((productTensor, weightedVal))
+        topDotProductList = []
+        bottomDotProductList = []
+        topProducts, bottomProducts = await self.getTopScores()
+        for i in range(len(topProducts)):
+            #Make both product values tensors
+            topProductTensor = model.encode(topProducts[i], convert_to_tensor=True)
+            bottomProductTensor = model.encode(bottomProducts[i], convert_to_tensor=True)
+            #Find the dot product between the subs and the tensors
+            topDotProduct = torch.dot(subredditTensor, topProductTensor)
+            bottomDotProduct = torch.dot(subredditTensor, bottomProductTensor)
+            #
+            topWeightedVal = torch.exp(-topDotProduct)
+            bottomWeightedVal = torch.exp(-bottomDotProduct)
+            
+            topDotProductList.append((topProductTensor, topWeightedVal))
+            bottomDotProductList.append((bottomProductTensor, bottomWeightedVal))
         updateDirection = torch.zeros_like(subredditTensor)
         totalWeight = 0.0
-        for productTensor, weightedVal in dotProductList:
-            updateVal = torch.mul(productTensor, weightedVal)
-            updateDirection.append(updateVal)     
-            totalWeight += weightedVal
+        for i in range(len(topDotProductList)):
+            topProductTensor, topWeightedVal = topDotProductList[i]
+            bottomProductTensor, bottomWeightedVal = bottomDotProductList[i]
+            
+            updateDirection += topWeightedVal * topProductTensor
+            updateDirection -= bottomWeightedVal * bottomProductTensor
+            
+            totalWeight += topWeightedVal + bottomWeightedVal
         if totalWeight > 0:
             updateDirection = torch.div(updateDirection, totalWeight)
+        return updateDirection
     
-test = AI()
-if (test):
-    print("GETTING VALS...")
-    arr = test.getTopScores()
-    
+    #This will be used for finding the cosine similarity discrepencies 
+    async def cosineSimilarity(self):
+        subredditToAdd = await self.makeTensor() 
+        subreddit = torch.nn.parameter.Parameter(data=subredditToAdd, requires_grad=True)
+        maxDotProduct = await self.maximizeDotProduct()
+        products = self.getProducts()
+        cos = torch.nn.CosineSimilarity(1, 1e-8)
+        
+        for product in products:
+            outputProductToDot = cos(product, maxDotProduct)
+            outputProductToSub = cos(product, subreddit)
             
+           
+
+async def main():
+    test = AI()
+    if test:
+        print("GETTING VALS...")
+        tensor = await test.maximizeDotProduct()
+        print(tensor)
+
+asyncio.run(main())
 
 
 
-    
-    
+
+
+
