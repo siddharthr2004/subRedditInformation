@@ -206,15 +206,18 @@ class AI:
         subreddit = torch.nn.parameter.Parameter(data=subredditToAdd, requires_grad=True)
         maxDotProduct = await self.maximizeDotProduct()
         products = self.getProducts()
-        epochs = 15
+        epochs = 50
         cos = torch.nn.CosineSimilarity(1, 1e-8)
-        
-        for epoch in epochs:
+        optimizer = torch.optim.Adam([subreddit], lr = 0.01)
+        for epoch in range(epochs):
             for product in products:
+                optimizer.zero_grad()
                 outputProductToDot = cos(product, maxDotProduct)
                 outputProductToSub = cos(product, subreddit)
                 loss = (outputProductToDot - outputProductToSub) **2
-                
+                torch.autograd.backward(loss)
+                optimizer.step()
+
             
            
 
