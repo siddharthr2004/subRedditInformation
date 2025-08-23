@@ -54,7 +54,7 @@ class AI:
         stopwordsSet = set(stopwords.words("english"))
         lemmatizer = WordNetLemmatizer()
         #Original is 3k
-        async for comment in subReddit.comments(limit=30):
+        async for comment in subReddit.comments(limit=15):
             if comment.author:
                 authors.add(comment.author)
         #original is 400
@@ -143,7 +143,7 @@ class AI:
                   currentScores = np.array(output['scores'])
                   fullArray = np.concatenate([fullArray, currentScores])
                   time.sleep(0.001)
-            topScores += fullArray 
+            topScores += fullArray
 
         paired = list(zip(products, topScores))
         #original amount if 200
@@ -166,7 +166,7 @@ class AI:
             tensor = torch.add(tensor, model.encode(comments[i], convert_to_tensor=True))
         tensor = torch.div(tensor, len(comments))
         return tensor
-      
+
     async def maximizeDotProduct(self):
         subredditTensor = await self.makeTensor()
         model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')
@@ -180,10 +180,10 @@ class AI:
             #Find the dot product between the subs and the tensors
             topDotProduct = torch.dot(subredditTensor, topProductTensor)
             bottomDotProduct = torch.dot(subredditTensor, bottomProductTensor)
-            #
+            #Get weighted val for each of the values here
             topWeightedVal = torch.exp(-topDotProduct)
             bottomWeightedVal = torch.exp(-bottomDotProduct)
-            
+
             topDotProductList.append((topProductTensor, topWeightedVal))
             bottomDotProductList.append((bottomProductTensor, bottomWeightedVal))
         updateDirection = torch.zeros_like(subredditTensor)
@@ -191,21 +191,23 @@ class AI:
         for i in range(len(topDotProductList)):
             topProductTensor, topWeightedVal = topDotProductList[i]
             bottomProductTensor, bottomWeightedVal = bottomDotProductList[i]
-            
+
             updateDirection += topWeightedVal * topProductTensor
             updateDirection -= bottomWeightedVal * bottomProductTensor
-            
+
             totalWeight += topWeightedVal + bottomWeightedVal
         if totalWeight > 0:
             updateDirection = torch.div(updateDirection, totalWeight)
         return updateDirection
-    
-    #This will be used for finding the cosine similarity discrepencies 
+
+    #This will be used for finding the cosine similarity discrepencies
     async def cosineSimilarity(self):
-        subredditToAdd = await self.makeTensor() 
+        subredditToAdd = await self.makeTensor()
         subreddit = torch.nn.parameter.Parameter(data=subredditToAdd, requires_grad=True)
         maxDotProduct = await self.maximizeDotProduct()
-        products = self.getProducts()
+        #add this in later, change to the correct method as well
+        #first spliced to only get the first 15 products for testing
+        products = self.makeProductArray()[:10]
         epochs = 50
         cos = torch.nn.CosineSimilarity(1, 1e-8)
         optimizer = torch.optim.Adam([subreddit], lr = 0.01)
@@ -217,19 +219,17 @@ class AI:
                 loss = (outputProductToDot - outputProductToSub) **2
                 torch.autograd.backward(loss)
                 optimizer.step()
+        return subreddit
 
-            
-           
 
 async def main():
     test = AI()
     if test:
         print("GETTING VALS...")
-        tensor = await test.maximizeDotProduct()
-        print(tensor)
-
-asyncio.run(main())
-
+        subredditTensor = await test.cosineSimilarity()
+        print(subredditTensor)
+if __name__ == "__main__":
+    asyncio.run(main())
 
 
 
