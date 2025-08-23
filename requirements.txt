@@ -1,0 +1,1 @@
+pip install praw asyncpraw openai transformers torch nltk sentence-transformers scikit-learn numpy
