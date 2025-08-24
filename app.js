@@ -2,8 +2,7 @@ const express = require("express");
 const app = express();
 const path = require("path");
 const promise = require("promise");
-const spawn = require("child_process");
-const port = 3001;
+const { spawn } = require("child_process");
 
 app.use(express.json());
 app.use(express.urlencoded({extended: false}));
@@ -18,12 +17,14 @@ app.get("/", (req, res) => {
 })
 
 app.post("/getSubInfo", async (req, res) => {
-    const sub = req.body.subName;
+    const sub = req.body.subname;
     const dirtyReturn = new Promise((resolve, reject) => {
         const pythonScript = spawn('python3', ['AI.py', sub]);
+        //python script was spawned
         let stdout = " ";
         let stderr = " "
         pythonScript.stdout.on('data', (data) => {
+            //test
             stdout += data;
         })
         pythonScript.stdout.on('end', () => {
@@ -41,17 +42,20 @@ app.post("/getSubInfo", async (req, res) => {
     })
     try {
         const toJsonify = await (dirtyReturn);
-        const valsToSend = JSON.parse(toJsonify);
+        const cleanedString = toJsonify.trim();
+        const String = `"${cleanedString}"`;
+        const valsToSend = JSON.parse(String);
         //WILL NEED TO LATER RUN THIS INTO AN EJS FILE
+        res.send(valsToSend);
     } catch (error) {
         console.log("error getting values");
+        console.log(error);
         res.status(500).send(error);
     }
+        
 })
 
-app.listen(port, 'localhost', (err) => {
-    if (err) {
-        console.log("error connecting to port", err);
-    }
-    console.log("listening to port 3001");
-})
+const port = process.env.PORT || 3002;
+app.listen(port, () => {
+  console.log(`Node.js app listening on port ${port}`);
+});

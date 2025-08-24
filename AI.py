@@ -1,3 +1,6 @@
+#for test purposes:
+import sys
+'''
 import praw
 import asyncpraw
 import subprocess
@@ -30,7 +33,7 @@ import asyncio
 # ...but this will be done later
 
 class AI:
-    def __init__(self):
+    def __init__(self, subreddit):
         # Replace these values with your Reddit app credentials
         CLIENT_ID = "IV3KzklQLKbcdr6QrNorZg"
         CLIENT_SECRET = "jv9DBrsI1GQIdQhhfUUR1B-tik2WkQ"
@@ -42,8 +45,8 @@ class AI:
         )
         # The user is passing subreddit as a command line argument, which won't work directly in Colab.
         # I will hardcode a default value for now.
-        self.subreddit = "learnpython" #sys.argv[1]
-        #TEST
+        self.subreddit = subreddit
+        #test
         print(self.subreddit)
 
     async def getComments(self):
@@ -204,6 +207,7 @@ class AI:
     async def cosineSimilarity(self):
         subredditToAdd = await self.makeTensor()
         subreddit = torch.nn.parameter.Parameter(data=subredditToAdd, requires_grad=True)
+        model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')
         maxDotProduct = await self.maximizeDotProduct()
         #add this in later, change to the correct method as well
         #first spliced to only get the first 15 products for testing
@@ -213,23 +217,27 @@ class AI:
         optimizer = torch.optim.Adam([subreddit], lr = 0.01)
         for epoch in range(epochs):
             for product in products:
+                productToAdd = model.encode(product, convert_to_tensor=True)
                 optimizer.zero_grad()
-                outputProductToDot = cos(product, maxDotProduct)
-                outputProductToSub = cos(product, subreddit)
+                outputProductToDot = cos(productToAdd, maxDotProduct)
+                outputProductToSub = cos(productToAdd, subreddit)
                 loss = (outputProductToDot - outputProductToSub) **2
                 torch.autograd.backward(loss)
                 optimizer.step()
         return subreddit
 
 
-async def main():
-    test = AI()
+async def main(subreddit):
+    test = AI(subreddit)
     if test:
         print("GETTING VALS...")
         subredditTensor = await test.cosineSimilarity()
         print(subredditTensor)
+'''
 if __name__ == "__main__":
-    asyncio.run(main())
+    sub = sys.argv[1]
+    print(sub)
+    #asyncio.run(main(sub))
 
 
 
