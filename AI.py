@@ -1,6 +1,6 @@
 #for test purposes:
 import sys
-'''
+
 import praw
 import asyncpraw
 import subprocess
@@ -233,7 +233,7 @@ async def main(subreddit):
         print("GETTING VALS...")
         subredditTensor = await test.cosineSimilarity()
         print(subredditTensor)
-'''
+
 if __name__ == "__main__":
     sub = sys.argv[1]
     print(sub)
