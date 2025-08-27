@@ -128,16 +128,7 @@ app.post("/inputSubInfo", async (req, res) => {
                     return;
                 }
                 console.log("Succesfully inputted tensor now");
-                
-                res.render("viewSubInfo", { stats: valsToSend }, (err) => {
-                    if (err) {
-                        console.log("Error serving viewSubInfo.ejs file", err ? err.message : err);
-                        res.send("Error serving viewSubInfo.ejs file");
-                        return;
-                    }
-                    console.log("successfully rendered info regarding file");
-                });
-                
+                res.send("succesfully inputted tensor info! Click back to the main page for more tasks");
             }
         );
     } catch (error) {
@@ -146,6 +137,23 @@ app.post("/inputSubInfo", async (req, res) => {
         res.status(500).send(error);
         return;
     }
+})
+
+app.post("/getSubInfo", (req, res) => {
+    const sub = req.body.subname;
+    db.run(
+        `SELECT subredditTensor FROM subTensors WHERE userId = ? AND subreddit = ?`, 
+        [req.session.userId, sub], 
+        (err, row) => {
+            if (err) {
+                console.log("error pulling from subredditTensor base, error message: ", err ? err.message : err);
+            }
+            if (row) {
+                const valsToSend = row.subredditTensor;
+                res.render("viewSubInfo", {stats: valsToSend});
+            }
+        }
+    )
 })
 
 const port = process.env.PORT || 3002;
