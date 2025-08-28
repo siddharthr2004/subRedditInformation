@@ -58,6 +58,8 @@ app.post("/welcomePage", (req, res) => {
         if (row) {
             if (password == row.password) {
                 req.session.userId = row.id;
+                //test
+                console.log(req.session.userId);
                 res.sendFile(filePath, (err) => {
                     if (err) {
                         console.log("sign in succesful, error serving file");
@@ -141,7 +143,9 @@ app.post("/inputSubInfo", async (req, res) => {
 
 app.post("/getSubInfo", (req, res) => {
     const sub = req.body.subname;
-    db.run(
+    console.log(sub);
+    console.log(req.session.userId);
+    db.get(
         `SELECT subredditTensor FROM subTensors WHERE userId = ? AND subreddit = ?`, 
         [req.session.userId, sub], 
         (err, row) => {
@@ -150,6 +154,7 @@ app.post("/getSubInfo", (req, res) => {
             }
             if (row) {
                 const valsToSend = row.subredditTensor;
+                console.log(valsToSend);
                 res.render("viewSubInfo", {stats: valsToSend});
             }
         }
