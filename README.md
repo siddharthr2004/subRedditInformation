@@ -1,5 +1,5 @@
 ## **Subreddit-Product matching tool** 
-Using AI, sentiment analysis and neural networks to match subreddits to their best fit products
+Using AI, machine learning, sentiment analysis and neural networks to match subreddits to products best fit for advertising.
 
 ## **Features:**
 - Uses gradient testing from thousands of comments to match best fit products
